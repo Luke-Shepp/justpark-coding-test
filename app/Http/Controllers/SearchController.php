@@ -5,9 +5,11 @@ namespace App\Http\Controllers;
 use App\Enums\ParkingTypes;
 use App\Gateways\ParkAndRideRankerGateway;
 use App\Gateways\ParkingSpaceRankerGateway;
+use App\Http\Resources\Location;
 use App\SearchService;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
+use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Input;
 
@@ -22,6 +24,11 @@ class SearchController extends Controller
     /** @var ParkingSpaceRankerGateway */
     private $parkingSpaceGateway;
 
+    /**
+     * @param SearchService $searchService
+     * @param ParkAndRideRankerGateway $parkAndRideGateway
+     * @param ParkingSpaceRankerGateway $parkingSpaceGateway
+     */
     public function __construct(
         SearchService $searchService,
         ParkAndRideRankerGateway $parkAndRideGateway,
@@ -32,16 +39,27 @@ class SearchController extends Controller
         $this->parkingSpaceGateway = $parkingSpaceGateway;
     }
 
-    public function index(Request $request) {
-        $boundingBox = $this->searchService->getBoundingBox($request->input('lat'), $request->input('lng'), 5);
-        $parkingSpaces = $this->searchService->searchParkingSpaces($boundingBox);
-        // @todo Part 2) rank parking spaces
+    /**
+     * @param Request $request
+     * @return JsonResource
+     */
+    public function index(Request $request): JsonResource
+    {
+        $locations = new Collection();
+
+        $boundingBox = $this->searchService->getBoundingBox(
+            $request->input('lat'),
+            $request->input('lng'),
+            5
+        );
 
         $parkAndRide = $this->searchService->searchParkAndRide($boundingBox);
-        $rankedParkAndRide = $this->parkAndRideGateway->rank($parkAndRide);
+        $locations = $locations->merge($this->parkAndRideGateway->rank($parkAndRide));
 
-        $resultArray = [];/*@todo Part 2)*/
-        return \App\Http\Resources\Location::collection(collect($resultArray));
+        $parkingSpaces = $this->searchService->searchParkingSpaces($boundingBox);
+        $locations = $locations->merge($this->parkingSpaceGateway->rank($parkingSpaces));
+
+        return Location::collection($locations);
     }
 
     /**
