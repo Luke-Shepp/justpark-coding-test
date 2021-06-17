@@ -2,41 +2,86 @@
 
 namespace App\Http\Controllers;
 
+use App\Enums\ParkingTypes;
 use App\Gateways\ParkAndRideRankerGateway;
 use App\Gateways\ParkingSpaceRankerGateway;
 use App\SearchService;
+use Illuminate\Http\JsonResponse;
+use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Input;
 
 class SearchController extends Controller
 {
-    public function index(
+    /** @var SearchService */
+    private $searchService;
+
+    /** @var ParkAndRideRankerGateway */
+    private $parkAndRideGateway;
+
+    /** @var ParkingSpaceRankerGateway */
+    private $parkingSpaceGateway;
+
+    public function __construct(
         SearchService $searchService,
         ParkAndRideRankerGateway $parkAndRideGateway,
         ParkingSpaceRankerGateway $parkingSpaceGateway
     ) {
-        $boundingBox = $searchService->getBoundingBox(request()->input('lat'), request()->input('lng'), 5);
-        $parkingSpaces = $searchService->searchParkingSpaces($boundingBox);
+        $this->searchService = $searchService;
+        $this->parkAndRideGateway = $parkAndRideGateway;
+        $this->parkingSpaceGateway = $parkingSpaceGateway;
+    }
+
+    public function index(Request $request) {
+        $boundingBox = $this->searchService->getBoundingBox($request->input('lat'), $request->input('lng'), 5);
+        $parkingSpaces = $this->searchService->searchParkingSpaces($boundingBox);
         // @todo Part 2) rank parking spaces
 
-        $parkAndRide = $searchService->searchParkAndRide($boundingBox);
-        $rankedParkAndRide = $parkAndRideGateway->rank($parkAndRide);
+        $parkAndRide = $this->searchService->searchParkAndRide($boundingBox);
+        $rankedParkAndRide = $this->parkAndRideGateway->rank($parkAndRide);
 
         $resultArray = [];/*@todo Part 2)*/
         return \App\Http\Resources\Location::collection(collect($resultArray));
     }
 
-    public function details(SearchService $searchService)
+    /**
+     * @param Request $request
+     * @return JsonResponse
+     */
+    public function details(Request $request): JsonResponse
     {
-        $boundingBox = $searchService->getBoundingBox(request()->input('lat'), request()->input('lng'), 5);
-        $parkingSpaces = $searchService->searchParkingSpaces($boundingBox);
-        $parkAndRide = $searchService->searchParkAndRide($boundingBox);
+        $boundingBox = $this->searchService->getBoundingBox(
+            $request->input('lat'),
+            $request->input('lng'),
+            5
+        );
 
-        $things = [];
-        return response()->json($this->formatLocations($things));
+        $locations = [
+            ParkingTypes::PARK_AND_RIDE => $this->searchService->searchParkAndRide($boundingBox),
+            ParkingTypes::PARKING_SPACE => $this->searchService->searchParkingSpaces($boundingBox),
+        ];
+
+        return response()->json($this->formatLocations($locations));
     }
 
-    private function formatLocations(array $things)
+    /**
+     * @param array $unformattedLocations
+     * @return Collection
+     */
+    private function formatLocations(array $unformattedLocations): Collection
     {
-        //@todo Part 1) format 'park and rides' and parking spaces for response
+        $formatted = new Collection();
+
+        foreach ($unformattedLocations as $type => $locations) {
+            $formatted = $formatted->merge(collect($locations)
+                ->map(function ($location) use ($type) {
+                    return [
+                        'description'   => __("locations.$type.description", $location->toArray()),
+                        'location_name' => __("locations.$type.name", $location->toArray()),
+                    ];
+                }));
+        }
+
+        return $formatted;
     }
 }
