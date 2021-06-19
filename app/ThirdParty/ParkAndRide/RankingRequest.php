@@ -3,16 +3,18 @@
 
 namespace App\ThirdParty\ParkAndRide;
 
+use Illuminate\Support\Collection;
+
 class RankingRequest
 {
     private $ids;
 
-    public function __construct(array $ids)
+    public function __construct(Collection $ids)
     {
         $this->ids = $ids;
     }
 
-    public function getIds(): array
+    public function getIds(): Collection
     {
         return $this->ids;
     }

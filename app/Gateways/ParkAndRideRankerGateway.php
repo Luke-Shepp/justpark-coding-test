@@ -32,7 +32,9 @@ class ParkAndRideRankerGateway
         }
 
         try {
-            $rankedResponse = $this->parkAndRide->getRankingResponse(new RankingRequest(array_keys($keyedItems)))->getResult();
+            $rankedResponse = $this->parkAndRide
+                ->getRankingResponse(new RankingRequest(collect($keyedItems)->keys()))
+                ->getResult();
         } catch (TimeoutException $exception) {
             Log::error('Timeout ranking park and ride locations');
 
