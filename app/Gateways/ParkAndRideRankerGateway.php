@@ -12,6 +12,9 @@ class ParkAndRideRankerGateway
     /** @var ParkAndRideSDK */
     private $parkAndRide;
 
+    /** @var int SDK timeout in milliseconds */
+    private const TIMEOUT = 1000;
+
     /**
      * @param ParkAndRideSDK $parkAndRide
      */
@@ -33,7 +36,7 @@ class ParkAndRideRankerGateway
 
         try {
             $rankedResponse = $this->parkAndRide
-                ->getRankingResponse(new RankingRequest(collect($keyedItems)->keys()))
+                ->getRankingResponse(new RankingRequest(collect($keyedItems)->keys()), self::TIMEOUT)
                 ->getResult();
         } catch (TimeoutException $exception) {
             Log::error('Timeout ranking park and ride locations');
